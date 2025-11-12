@@ -1,0 +1,109 @@
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { Cpu, Shield, Users, Activity, LogIn, Home, AlertCircle } from 'lucide-react';
+
+// Components
+import LandingPage from './pages/LandingPage';
+import LoginPage from './pages/LoginPage';
+import AdminDashboard from './pages/AdminDashboard';
+import UserDashboard from './pages/UserDashboard';
+
+// Services
+import { authService } from './services/authService';
+
+function App() {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Check if user is already logged in
+    const token = localStorage.getItem('sessionId');
+    const userData = localStorage.getItem('userData');
+    
+    if (token && userData) {
+      try {
+        const parsedUser = JSON.parse(userData);
+        setUser(parsedUser);
+      } catch (error) {
+        console.error('Failed to parse user data:', error);
+        localStorage.removeItem('userData');
+        localStorage.removeItem('sessionId');
+      }
+    }
+    setLoading(false);
+  }, []);
+
+  const handleLogin = (userData, sessionId) => {
+    setUser(userData);
+    localStorage.setItem('userData', JSON.stringify(userData));
+    localStorage.setItem('sessionId', sessionId);
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    localStorage.removeItem('userData');
+    localStorage.removeItem('sessionId');
+  };
+
+  if (loading) {
+    return (
+      <div className="k8s-container flex items-center justify-center">
+        <div className="text-center">
+          <Cpu className="k8s-logo-animation w-16 h-16 text-k8s-blue mx-auto mb-4" />
+          <div className="k8s-loader mx-auto"></div>
+          <p className="text-k8s-gray mt-4">Initializing K8s Smart Bot...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <Router>
+      <div className="k8s-container">
+        <Routes>
+          <Route 
+            path="/" 
+            element={
+              user ? (
+                user.role === 'admin' ? 
+                <Navigate to="/admin/dashboard" replace /> : 
+                <Navigate to="/user/dashboard" replace />
+              ) : 
+              <LandingPage />
+            } 
+          />
+          <Route 
+            path="/login" 
+            element={
+              user ? (
+                user.role === 'admin' ? 
+                <Navigate to="/admin/dashboard" replace /> : 
+                <Navigate to="/user/dashboard" replace />
+              ) : 
+              <LoginPage onLogin={handleLogin} />
+            } 
+          />
+          <Route 
+            path="/admin/dashboard" 
+            element={
+              user && user.role === 'admin' ? 
+              <AdminDashboard user={user} onLogout={handleLogout} /> : 
+              <Navigate to="/login" replace />
+            } 
+          />
+          <Route 
+            path="/user/dashboard" 
+            element={
+              user && user.role === 'user' ? 
+              <UserDashboard user={user} onLogout={handleLogout} /> : 
+              <Navigate to="/login" replace />
+            } 
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </div>
+    </Router>
+  );
+}
+
+export default App;
