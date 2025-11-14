@@ -1,0 +1,199 @@
+import axios from 'axios';
+
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+
+class ApiService {
+  constructor() {
+    this.api = axios.create({
+      baseURL: API_BASE_URL,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+  }
+
+  // Health check
+  async getHealth() {
+    try {
+      const response = await this.api.get('/health');
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Health check error:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Admin endpoints
+  async getUsers() {
+    try {
+      const response = await this.api.get('/admin/users');
+      return { success: true, users: response.data.users };
+    } catch (error) {
+      console.error('Get users error:', error);
+      return { success: false, error: error.response?.data?.error || 'Failed to get users' };
+    }
+  }
+
+  async createUser(userData) {
+    try {
+      const response = await this.api.post('/admin/users', userData);
+      return { success: true, user: response.data };
+    } catch (error) {
+      console.error('Create user error:', error);
+      return { success: false, error: error.response?.data?.error || 'Failed to create user' };
+    }
+  }
+
+  async banUser(userId) {
+    try {
+      await this.api.post(`/admin/users/${userId}/ban`);
+      return { success: true };
+    } catch (error) {
+      console.error('Ban user error:', error);
+      return { success: false, error: error.response?.data?.error || 'Failed to ban user' };
+    }
+  }
+
+  async unbanUser(userId) {
+    try {
+      await this.api.post(`/admin/users/${userId}/unban`);
+      return { success: true };
+    } catch (error) {
+      console.error('Unban user error:', error);
+      return { success: false, error: error.response?.data?.error || 'Failed to unban user' };
+    }
+  }
+
+  async getActivityLogs(userId = null, limit = 100) {
+    try {
+      const params = userId ? { user_id: userId, limit } : { limit };
+      const response = await this.api.get('/admin/logs', { params });
+      return { success: true, logs: response.data.logs };
+    } catch (error) {
+      console.error('Get activity logs error:', error);
+      return { success: false, error: error.response?.data?.error || 'Failed to get activity logs' };
+    }
+  }
+
+  // Kubeconfig endpoints
+  async getKubeconfigs() {
+    try {
+      const response = await this.api.get('/admin/kubeconfigs');
+      return { success: true, kubeconfigs: response.data.kubeconfigs };
+    } catch (error) {
+      console.error('Get kubeconfigs error:', error);
+      return { success: false, error: error.response?.data?.error || 'Failed to get kubeconfigs' };
+    }
+  }
+
+  async createKubeconfig(kubeconfigData) {
+    try {
+      const response = await this.api.post('/admin/kubeconfigs', kubeconfigData);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Create kubeconfig error:', error);
+      return { success: false, error: error.response?.data?.error || 'Failed to create kubeconfig' };
+    }
+  }
+
+  async updateKubeconfig(kubeconfigId, kubeconfigData) {
+    try {
+      const response = await this.api.put(`/admin/kubeconfigs/${kubeconfigId}`, kubeconfigData);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Update kubeconfig error:', error);
+      return { success: false, error: error.response?.data?.error || 'Failed to update kubeconfig' };
+    }
+  }
+
+  async deleteKubeconfig(kubeconfigId) {
+    try {
+      const response = await this.api.delete(`/admin/kubeconfigs/${kubeconfigId}`);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Delete kubeconfig error:', error);
+      return { success: false, error: error.response?.data?.error || 'Failed to delete kubeconfig' };
+    }
+  }
+
+  async activateKubeconfig(kubeconfigId) {
+    try {
+      const response = await this.api.post(`/admin/kubeconfigs/${kubeconfigId}/activate`);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Activate kubeconfig error:', error);
+      return { success: false, error: error.response?.data?.error || 'Failed to activate kubeconfig' };
+    }
+  }
+
+  async testKubeconfig(kubeconfigId) {
+    try {
+      const response = await this.api.post(`/admin/kubeconfigs/${kubeconfigId}/test`);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Test kubeconfig error:', error);
+      return { success: false, error: error.response?.data?.error || 'Failed to test kubeconfig' };
+    }
+  }
+
+  async getActiveKubeconfig() {
+    try {
+      const response = await this.api.get('/admin/kubeconfigs/active');
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('Get active kubeconfig error:', error);
+      return { success: false, error: error.response?.data?.error || 'Failed to get active kubeconfig' };
+    }
+  }
+
+  // User endpoints
+  async getUserPreferences(userId) {
+    try {
+      const response = await this.api.get('/user/preferences', {
+        params: { user_id: userId }
+      });
+      return { success: true, preferences: response.data.preferences };
+    } catch (error) {
+      console.error('Get preferences error:', error);
+      return { success: false, error: error.response?.data?.error || 'Failed to get preferences' };
+    }
+  }
+
+  async updateUserPreferences(userId, preferences) {
+    try {
+      await this.api.put('/user/preferences', {
+        user_id: userId,
+        ...preferences
+      });
+      return { success: true };
+    } catch (error) {
+      console.error('Update preferences error:', error);
+      return { success: false, error: error.response?.data?.error || 'Failed to update preferences' };
+    }
+  }
+
+  async getUserSessions(userId) {
+    try {
+      const response = await this.api.get('/user/sessions', {
+        params: { user_id: userId }
+      });
+      return { success: true, sessions: response.data.sessions };
+    } catch (error) {
+      console.error('Get sessions error:', error);
+      return { success: false, error: error.response?.data?.error || 'Failed to get sessions' };
+    }
+  }
+
+  async getUserHistory(userId, sessionId = null, limit = 50) {
+    try {
+      const params = sessionId ? { user_id: userId, session_id: sessionId, limit } : { user_id: userId, limit };
+      const response = await this.api.get('/user/history', { params });
+      return { success: true, history: response.data.history };
+    } catch (error) {
+      console.error('Get history error:', error);
+      return { success: false, error: error.response?.data?.error || 'Failed to get history' };
+    }
+  }
+}
+
+export const apiService = new ApiService();
