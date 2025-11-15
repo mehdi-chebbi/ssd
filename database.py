@@ -1631,6 +1631,218 @@ class Database:
                 cursor.close()
                 self._put_connection(conn)
     
+    # ==================== JWT TOKEN MANAGEMENT ====================
+
+    def create_jwt_token(self, user_id: int, token: str, expires_at: datetime,
+                        description: str = None) -> bool:
+        """Create a JWT token record"""
+        conn = None
+        try:
+            import hashlib
+            token_hash = hashlib.sha256(token.encode()).hexdigest()
+
+            conn = self._get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                INSERT INTO jwt_tokens (user_id, token_hash, expires_at, created_at, description)
+                VALUES (%s, %s, %s, %s, %s)
+                RETURNING id
+            """, (user_id, token_hash, expires_at, datetime.now(), description))
+
+            token_id = cursor.fetchone()[0]
+            conn.commit()
+
+            logger.info(f"JWT token created: user_id {user_id}, token_id {token_id}")
+            return True
+
+        except Exception as e:
+            if conn:
+                conn.rollback()
+            logger.error(f"Failed to create JWT token: {str(e)}")
+            return False
+        finally:
+            if conn:
+                cursor.close()
+                self._put_connection(conn)
+
+    def validate_jwt_token(self, token: str) -> Optional[Dict[str, Any]]:
+        """Validate JWT token against database"""
+        conn = None
+        try:
+            import hashlib
+            token_hash = hashlib.sha256(token.encode()).hexdigest()
+
+            conn = self._get_connection()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+            cursor.execute("""
+                SELECT jt.user_id, jt.expires_at, jt.last_used, jt.description,
+                       u.username, u.role, u.is_banned
+                FROM jwt_tokens jt
+                JOIN users u ON jt.user_id = u.id
+                WHERE jt.token_hash = %s AND jt.is_active = TRUE
+            """, (token_hash,))
+
+            result = cursor.fetchone()
+            cursor.close()
+            self._put_connection(conn)
+
+            if not result:
+                logger.warning("JWT token not found or inactive")
+                return None
+
+            # Check if user is banned
+            if result['is_banned']:
+                logger.warning(f"JWT token for banned user: {result['username']}")
+                return None
+
+            # Check if token has expired
+            if datetime.utcnow() > result['expires_at']:
+                logger.warning("JWT token has expired")
+                # Deactivate expired token
+                self.deactivate_jwt_token(token_hash)
+                return None
+
+            # Update last used timestamp
+            self._update_token_last_used(token_hash)
+
+            logger.info(f"JWT token validated for user {result['username']} (ID: {result['user_id']})")
+            return {
+                'user_id': result['user_id'],
+                'username': result['username'],
+                'role': result['role']
+            }
+
+        except Exception as e:
+            logger.error(f"Error validating JWT token: {str(e)}")
+            return None
+        finally:
+            if conn:
+                self._put_connection(conn)
+
+    def revoke_jwt_token(self, token: str) -> bool:
+        """Revoke a JWT token"""
+        conn = None
+        try:
+            import hashlib
+            token_hash = hashlib.sha256(token.encode()).hexdigest()
+            return self.deactivate_jwt_token(token_hash)
+
+        except Exception as e:
+            logger.error(f"Failed to revoke JWT token: {str(e)}")
+            return False
+
+    def deactivate_jwt_token(self, token_hash: str) -> bool:
+        """Deactivate a JWT token by hash"""
+        conn = None
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                UPDATE jwt_tokens
+                SET is_active = FALSE
+                WHERE token_hash = %s
+            """, (token_hash,))
+
+            conn.commit()
+            deactivated = cursor.rowcount > 0
+
+            if deactivated:
+                logger.info(f"JWT token deactivated: {token_hash[:16]}...")
+
+            return deactivated
+
+        except Exception as e:
+            if conn:
+                conn.rollback()
+            logger.error(f"Failed to deactivate JWT token: {str(e)}")
+            return False
+        finally:
+            if conn:
+                cursor.close()
+                self._put_connection(conn)
+
+    def get_active_tokens(self, user_id: int) -> List[Dict[str, Any]]:
+        """Get all active tokens for a user"""
+        conn = None
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+            cursor.execute("""
+                SELECT id, expires_at, created_at, last_used, description
+                FROM jwt_tokens
+                WHERE user_id = %s AND is_active = TRUE AND expires_at > %s
+                ORDER BY created_at DESC
+            """, (user_id, datetime.now()))
+
+            tokens = cursor.fetchall()
+            cursor.close()
+            self._put_connection(conn)
+
+            return [dict(token) for token in tokens]
+
+        except Exception as e:
+            logger.error(f"Failed to get active tokens: {str(e)}")
+            return []
+        finally:
+            if conn:
+                self._put_connection(conn)
+
+    def cleanup_expired_tokens(self) -> int:
+        """Clean up expired JWT tokens"""
+        conn = None
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                DELETE FROM jwt_tokens
+                WHERE expires_at < %s
+            """, (datetime.now(),))
+
+            deleted_count = cursor.rowcount
+            conn.commit()
+
+            logger.info(f"Cleaned up {deleted_count} expired JWT tokens")
+            return deleted_count
+
+        except Exception as e:
+            if conn:
+                conn.rollback()
+            logger.error(f"Failed to cleanup expired tokens: {str(e)}")
+            return 0
+        finally:
+            if conn:
+                cursor.close()
+                self._put_connection(conn)
+
+    def _update_token_last_used(self, token_hash: str) -> bool:
+        """Update the last used timestamp for a token"""
+        conn = None
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                UPDATE jwt_tokens
+                SET last_used = %s
+                WHERE token_hash = %s
+            """, (datetime.now(), token_hash))
+
+            conn.commit()
+            return cursor.rowcount > 0
+
+        except Exception as e:
+            logger.error(f"Failed to update token last used: {str(e)}")
+            return False
+        finally:
+            if conn:
+                cursor.close()
+                self._put_connection(conn)
+
     def close_all(self):
         """Close all database connections"""
         if self.connection_pool:
