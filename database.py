@@ -366,18 +366,50 @@ class Database:
     def _verify_api_keys_schema(self, cursor):
         """Verify api_keys table schema"""
         cursor.execute("""
-            SELECT column_name FROM information_schema.columns 
+            SELECT column_name FROM information_schema.columns
             WHERE table_name = 'api_keys' AND table_schema = 'public'
         """)
         existing_columns = {row[0] for row in cursor.fetchall()}
-        
-        required_columns = {'id', 'name', 'provider', 'api_key', 'description', 
+
+        required_columns = {'id', 'name', 'provider', 'api_key', 'description',
                           'is_active', 'created_at', 'updated_at', 'created_by',
                           'last_used', 'usage_count'}
-        
+
         missing = required_columns - existing_columns
         if missing:
             logger.warning(f"Missing columns in api_keys: {missing}")
+
+    def _create_jwt_tokens_table(self, cursor):
+        """Create jwt_tokens table"""
+        cursor.execute("""
+            CREATE TABLE jwt_tokens (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                token_hash TEXT NOT NULL,
+                expires_at TIMESTAMP NOT NULL,
+                created_at TIMESTAMP NOT NULL,
+                last_used TIMESTAMP,
+                is_active BOOLEAN DEFAULT TRUE,
+                description TEXT,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                UNIQUE(user_id, token_hash)
+            )
+        """)
+
+    def _verify_jwt_tokens_schema(self, cursor):
+        """Verify jwt_tokens table schema"""
+        cursor.execute("""
+            SELECT column_name FROM information_schema.columns
+            WHERE table_name = 'jwt_tokens' AND table_schema = 'public'
+        """)
+        existing_columns = {row[0] for row in cursor.fetchall()}
+
+        required_columns = {'id', 'user_id', 'token_hash', 'expires_at',
+                          'created_at', 'last_used', 'is_active', 'description'}
+
+        missing = required_columns - existing_columns
+        if missing:
+            logger.warning(f"Missing columns in jwt_tokens: {missing}")
     
     def _create_indexes(self, cursor):
         """Create database indexes for performance"""
