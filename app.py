@@ -57,11 +57,30 @@ def create_app():
         logger.error(f"Failed to initialize database: {e}")
         logger.error("This is a critical component - application cannot start without database")
         sys.exit(1)  # Exit if we can't connect to database
-    
+
+    # Initialize JWT utilities
+    try:
+        jwt_utils = JWTUtils()
+        logger.info("JWT utilities initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize JWT utilities: {e}")
+        logger.warning("JWT authentication will not be available")
+
+    # Initialize authentication middleware
+    try:
+        auth_middleware = AuthMiddleware(db, jwt_utils)
+        logger.info("Authentication middleware initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize authentication middleware: {e}")
+        logger.error("This is a critical component - application cannot start without auth")
+        sys.exit(1)  # Exit if we can't initialize auth
+
     # Store components in app context
     app.k8s_client = k8s_client
     app.hybrid_classifier = hybrid_classifier
     app.db = db
+    app.jwt_utils = jwt_utils
+    app.auth_middleware = auth_middleware
     
     # Store in-memory conversation history (will be synced with DB)
     app.conversation_history = {}
