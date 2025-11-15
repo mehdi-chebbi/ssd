@@ -431,9 +431,13 @@ class Database:
             "CREATE INDEX IF NOT EXISTS idx_api_keys_name ON api_keys(name)",
             "CREATE INDEX IF NOT EXISTS idx_api_keys_provider ON api_keys(provider)",
             "CREATE INDEX IF NOT EXISTS idx_api_keys_is_active ON api_keys(is_active)",
-            "CREATE INDEX IF NOT EXISTS idx_api_keys_created_by ON api_keys(created_by)"
+            "CREATE INDEX IF NOT EXISTS idx_api_keys_created_by ON api_keys(created_by)",
+            "CREATE INDEX IF NOT EXISTS idx_jwt_tokens_user_id ON jwt_tokens(user_id)",
+            "CREATE INDEX IF NOT EXISTS idx_jwt_tokens_token_hash ON jwt_tokens(token_hash)",
+            "CREATE INDEX IF NOT EXISTS idx_jwt_tokens_expires_at ON jwt_tokens(expires_at)",
+            "CREATE INDEX IF NOT EXISTS idx_jwt_tokens_is_active ON jwt_tokens(is_active)"
         ]
-        
+
         for index_sql in indexes:
             try:
                 cursor.execute(index_sql)
