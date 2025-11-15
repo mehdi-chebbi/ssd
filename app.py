@@ -365,33 +365,34 @@ def get_token():
 # ==================== ADMIN ENDPOINTS ====================
 
 @app.route('/admin/users', methods=['GET'])
+@app.auth_middleware.require_admin
 def get_users():
     """Get all users (admin only)"""
     try:
-        # TODO: Add authentication middleware to verify admin role
         users = app.db.get_all_users()
         return jsonify({'users': users})
-        
+
     except Exception as e:
         logger.error(f"Error getting users: {str(e)}")
         return jsonify({'error': 'Failed to get users'}), 500
 
 @app.route('/admin/users', methods=['POST'])
+@app.auth_middleware.require_admin
 def create_user():
     """Create new user (admin only)"""
     try:
         data = request.get_json()
-        
+
         if not data or 'username' not in data or 'email' not in data or 'password' not in data:
             return jsonify({'error': 'Username, email, and password are required'}), 400
-        
+
         username = data['username']
         email = data['email']
         password = data['password']
         role = data.get('role', 'user')
-        
+
         user_id = app.db.create_user(username, email, password, role)
-        
+
         if user_id:
             return jsonify({
                 'message': 'User created successfully',
@@ -399,7 +400,7 @@ def create_user():
             }), 201
         else:
             return jsonify({'error': 'Failed to create user - username or email already exists'}), 400
-        
+
     except Exception as e:
         logger.error(f"Error creating user: {str(e)}")
         return jsonify({'error': 'Failed to create user'}), 500
