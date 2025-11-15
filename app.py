@@ -11,6 +11,8 @@ from k8s_client import K8sClient
 from openrouter_client import OpenRouterClient
 from question_classifier import HybridQuestionClassifier, QuestionType
 from database import Database
+from middleware import AuthMiddleware
+from utils.jwt_utils import JWTUtils
 
 # Configure logging
 logging.basicConfig(
