@@ -968,36 +968,36 @@ def chat():
 # ==================== KUBECONFIG ENDPOINTS ====================
 
 @app.route('/admin/kubeconfigs', methods=['GET'])
+@app.auth_middleware.require_admin
 def get_kubeconfigs():
     """Get all kubeconfigurations (admin only)"""
     try:
-        # TODO: Add authentication middleware to verify admin role
         kubeconfigs = app.db.get_all_kubeconfigs()
         return jsonify({'kubeconfigs': kubeconfigs})
-        
+
     except Exception as e:
         logger.error(f"Error getting kubeconfigs: {str(e)}")
         return jsonify({'error': 'Failed to get kubeconfigs'}), 500
 
 @app.route('/admin/kubeconfigs', methods=['POST'])
+@app.auth_middleware.require_admin
 def create_kubeconfig():
     """Create new kubeconfig (admin only)"""
     try:
-        # TODO: Add authentication middleware to verify admin role
         data = request.get_json()
-        
+
         if not data or 'name' not in data or 'path' not in data:
             return jsonify({'error': 'Name and path are required'}), 400
-        
+
         name = data['name'].strip()
         path = data['path'].strip()
         description = data.get('description', '').strip()
         is_default = data.get('is_default', False)
-        created_by = data.get('created_by')  # Optional user ID
-        
+        created_by = request.current_user['user_id']  # Use authenticated user ID
+
         if not name or not path:
             return jsonify({'error': 'Name and path cannot be empty'}), 400
-        
+
         kubeconfig_id = app.db.create_kubeconfig(
             name=name,
             path=path,
@@ -1005,7 +1005,7 @@ def create_kubeconfig():
             created_by=created_by,
             is_default=is_default
         )
-        
+
         if kubeconfig_id:
             return jsonify({
                 'message': 'Kubeconfig created successfully',
@@ -1013,7 +1013,7 @@ def create_kubeconfig():
             }), 201
         else:
             return jsonify({'error': 'Failed to create kubeconfig - name may already exist'}), 400
-        
+
     except Exception as e:
         logger.error(f"Error creating kubeconfig: {str(e)}")
         return jsonify({'error': 'Failed to create kubeconfig'}), 500
