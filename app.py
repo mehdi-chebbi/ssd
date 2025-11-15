@@ -272,17 +272,95 @@ def logout():
     try:
         data = request.get_json()
         session_id = data.get('session_id')
-        
+        token = data.get('token')
+
         if session_id:
             # Clear in-memory conversation history
             if session_id in app.conversation_history:
                 del app.conversation_history[session_id]
-        
+
+        if token and app.jwt_utils:
+            # Revoke JWT token
+            app.db.revoke_jwt_token(token)
+
         return jsonify({'message': 'Logout successful'})
-        
+
     except Exception as e:
         logger.error(f"Logout error: {str(e)}")
         return jsonify({'error': 'Logout failed'}), 500
+
+@app.route('/auth/token', methods=['POST'])
+def get_token():
+    """Get JWT token for existing session or create new token"""
+    try:
+        data = request.get_json()
+
+        if not app.jwt_utils:
+            return jsonify({'error': 'JWT authentication not available'}), 503
+
+        # Method 1: Exchange session ID for JWT token
+        if 'session_id' in data:
+            session_id = data['session_id']
+            user_info = app.auth_middleware.validate_session(session_id)
+
+            if not user_info:
+                return jsonify({'error': 'Invalid session'}), 401
+
+            # Generate JWT token
+            token = app.jwt_utils.generate_jwt_token(
+                user_id=user_info['user_id'],
+                username=user_info['username'],
+                role=user_info['role']
+            )
+
+            # Store token in database
+            from datetime import datetime, timedelta
+            expires_at = datetime.utcnow() + timedelta(hours=app.jwt_utils.default_expiration_hours)
+            app.db.create_jwt_token(user_info['user_id'], token, expires_at, "Session exchange")
+
+            return jsonify({
+                'token': token,
+                'user': user_info,
+                'expires_at': expires_at.isoformat()
+            })
+
+        # Method 2: Login with username/password and get JWT token directly
+        elif 'username' in data and 'password' in data:
+            username = data['username']
+            password = data['password']
+
+            # Authenticate user
+            user = app.db.authenticate_user(username, password)
+
+            if not user:
+                return jsonify({'error': 'Invalid credentials or user is banned'}), 401
+
+            # Generate JWT token
+            token = app.jwt_utils.generate_jwt_token(
+                user_id=user['id'],
+                username=user['username'],
+                role=user['role']
+            )
+
+            # Store token in database
+            expires_at = datetime.utcnow() + timedelta(hours=app.jwt_utils.default_expiration_hours)
+            app.db.create_jwt_token(user['id'], token, expires_at, "Direct login")
+
+            # Log activity
+            app.db.log_activity(user['id'], 'token_login', success=True)
+
+            return jsonify({
+                'token': token,
+                'user': user,
+                'expires_at': expires_at.isoformat()
+            })
+
+        else:
+            return jsonify({'error': 'Session ID or username/password required'}), 400
+
+    except Exception as e:
+        logger.error(f"Token generation error: {str(e)}")
+        return jsonify({'error': 'Token generation failed'}), 500
 
 # ==================== ADMIN ENDPOINTS ====================
 
