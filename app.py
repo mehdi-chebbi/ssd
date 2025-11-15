@@ -503,127 +503,111 @@ def get_activity_logs():
 # ==================== USER ENDPOINTS ====================
 
 @app.route('/user/preferences', methods=['GET'])
+@app.auth_middleware.require_ownership('user_id')
 def get_preferences():
     """Get user preferences"""
     try:
-        data = request.get_json()
-        user_id = data.get('user_id')
-        
-        if not user_id:
-            return jsonify({'error': 'User ID is required'}), 400
-        
+        user_id = request.current_user['user_id']
         preferences = app.db.get_user_preferences(user_id)
-        
+
         if preferences:
             return jsonify({'preferences': preferences})
         else:
             return jsonify({'error': 'Preferences not found'}), 404
-        
+
     except Exception as e:
         logger.error(f"Error getting preferences: {str(e)}")
         return jsonify({'error': 'Failed to get preferences'}), 500
 
 @app.route('/user/preferences', methods=['PUT'])
+@app.auth_middleware.require_ownership('user_id')
 def update_preferences():
     """Update user preferences"""
     try:
+        user_id = request.current_user['user_id']
         data = request.get_json()
-        user_id = data.get('user_id')
-        
-        if not user_id:
-            return jsonify({'error': 'User ID is required'}), 400
-        
+
         # Extract preference fields
         preferences = {
             key: data[key]
             for key in ['tone', 'response_style', 'personality', 'max_commands_preference', 'auto_investigate']
             if key in data
         }
-        
+
         success = app.db.update_user_preferences(user_id, preferences)
-        
+
         if success:
             return jsonify({'message': 'Preferences updated successfully'})
         else:
             return jsonify({'error': 'Failed to update preferences'}), 500
-        
+
     except Exception as e:
         logger.error(f"Error updating preferences: {str(e)}")
         return jsonify({'error': 'Failed to update preferences'}), 500
 
 @app.route('/user/sessions', methods=['GET'])
+@app.auth_middleware.require_ownership('user_id')
 def get_user_sessions():
     """Get all chat sessions for a user"""
     try:
-        user_id = request.args.get('user_id', type=int)
-        
-        if not user_id:
-            return jsonify({'error': 'User ID is required'}), 400
-        
+        user_id = request.current_user['user_id']
         sessions = app.db.get_user_sessions(user_id)
         return jsonify({'sessions': sessions})
-        
+
     except Exception as e:
         logger.error(f"Error getting sessions: {str(e)}")
         return jsonify({'error': 'Failed to get sessions'}), 500
 
 @app.route('/user/history', methods=['GET'])
+@app.auth_middleware.require_ownership('user_id')
 def get_user_history():
     """Get chat history for a user"""
     try:
-        user_id = request.args.get('user_id', type=int)
+        user_id = request.current_user['user_id']
         session_id = request.args.get('session_id')
         limit = request.args.get('limit', default=50, type=int)
-        
-        if not user_id:
-            return jsonify({'error': 'User ID is required'}), 400
-        
+
         history = app.db.get_chat_history(user_id, session_id=session_id, limit=limit)
         return jsonify({'history': history})
-        
+
     except Exception as e:
         logger.error(f"Error getting history: {str(e)}")
         return jsonify({'error': 'Failed to get history'}), 500
 
 @app.route('/user/history', methods=['DELETE'])
+@app.auth_middleware.require_ownership('user_id')
 def delete_user_history():
     """Delete chat history for a user"""
     try:
-        data = request.get_json()
-        user_id = data.get('user_id')
-        session_id = data.get('session_id')
-        
-        if not user_id:
-            return jsonify({'error': 'User ID is required'}), 400
-        
+        user_id = request.current_user['user_id']
+        session_id = request.get_json().get('session_id')
+
         success = app.db.delete_chat_history(user_id, session_id=session_id)
-        
+
         if success:
             return jsonify({'message': 'Chat history deleted successfully'})
         else:
             return jsonify({'error': 'Failed to delete history'}), 500
-        
+
     except Exception as e:
         logger.error(f"Error deleting history: {str(e)}")
         return jsonify({'error': 'Failed to delete history'}), 500
 
 @app.route('/user/sessions', methods=['POST'])
+@app.auth_middleware.require_ownership('user_id')
 def create_chat_session():
     """Create a new chat session"""
     try:
+        user_id = request.current_user['user_id']
         data = request.get_json()
-        user_id = data.get('user_id')
         title = data.get('title', 'New Chat')
-        
-        if not user_id:
-            return jsonify({'error': 'User ID is required'}), 400
-        
+
         # Generate unique session ID
         session_id = str(uuid.uuid4())
-        
+
         # Create session in database
         success = app.db.create_session(user_id, session_id, title)
-        
+
         if success:
             return jsonify({
                 'message': 'Session created successfully',
@@ -632,50 +616,47 @@ def create_chat_session():
             }), 201
         else:
             return jsonify({'error': 'Failed to create session'}), 500
-        
+
     except Exception as e:
         logger.error(f"Error creating session: {str(e)}")
         return jsonify({'error': 'Failed to create session'}), 500
 
 @app.route('/user/sessions/<session_id>', methods=['PUT'])
+@app.auth_middleware.require_ownership('user_id')
 def update_chat_session(session_id):
     """Update chat session title"""
     try:
+        user_id = request.current_user['user_id']
         data = request.get_json()
-        user_id = data.get('user_id')
         title = data.get('title')
-        
-        if not user_id or not title:
-            return jsonify({'error': 'User ID and title are required'}), 400
-        
+
+        if not title:
+            return jsonify({'error': 'Title is required'}), 400
+
         success = app.db.update_session_title(user_id, session_id, title)
-        
+
         if success:
             return jsonify({'message': 'Session updated successfully'})
         else:
             return jsonify({'error': 'Failed to update session'}), 500
-        
+
     except Exception as e:
         logger.error(f"Error updating session: {str(e)}")
         return jsonify({'error': 'Failed to update session'}), 500
 
 @app.route('/user/sessions/<session_id>', methods=['DELETE'])
+@app.auth_middleware.require_ownership('user_id')
 def delete_chat_session(session_id):
     """Delete a chat session"""
     try:
-        data = request.get_json()
-        user_id = data.get('user_id')
-        
-        if not user_id:
-            return jsonify({'error': 'User ID is required'}), 400
-        
+        user_id = request.current_user['user_id']
         success = app.db.delete_session(user_id, session_id)
-        
+
         if success:
             return jsonify({'message': 'Session deleted successfully'})
         else:
             return jsonify({'error': 'Failed to delete session'}), 500
-        
+
     except Exception as e:
         logger.error(f"Error deleting session: {str(e)}")
         return jsonify({'error': 'Failed to delete session'}), 500
