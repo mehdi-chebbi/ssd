@@ -406,91 +406,96 @@ def create_user():
         return jsonify({'error': 'Failed to create user'}), 500
 
 @app.route('/admin/users/<int:user_id>/ban', methods=['POST'])
+@app.auth_middleware.require_admin
 def ban_user(user_id):
     """Ban a user (admin only)"""
     try:
         success = app.db.ban_user(user_id)
-        
+
         if success:
             return jsonify({'message': f'User {user_id} banned successfully'})
         else:
             return jsonify({'error': 'Failed to ban user'}), 500
-        
+
     except Exception as e:
         logger.error(f"Error banning user: {str(e)}")
         return jsonify({'error': 'Failed to ban user'}), 500
 
 @app.route('/admin/users/<int:user_id>/unban', methods=['POST'])
+@app.auth_middleware.require_admin
 def unban_user(user_id):
     """Unban a user (admin only)"""
     try:
         success = app.db.unban_user(user_id)
-        
+
         if success:
             return jsonify({'message': f'User {user_id} unbanned successfully'})
         else:
             return jsonify({'error': 'Failed to unban user'}), 500
-        
+
     except Exception as e:
         logger.error(f"Error unbanning user: {str(e)}")
         return jsonify({'error': 'Failed to unban user'}), 500
 
 @app.route('/admin/users/<int:user_id>/role', methods=['PUT'])
+@app.auth_middleware.require_admin
 def update_user_role(user_id):
     """Update user role (admin only)"""
     try:
         data = request.get_json()
-        
+
         if not data or 'role' not in data:
             return jsonify({'error': 'Role is required'}), 400
-        
+
         new_role = data['role']
-        
+
         if new_role not in ['admin', 'user']:
             return jsonify({'error': 'Invalid role'}), 400
-        
+
         success = app.db.update_user_role(user_id, new_role)
-        
+
         if success:
             return jsonify({'message': f'User {user_id} role updated to {new_role}'})
         else:
             return jsonify({'error': 'Failed to update role'}), 500
-        
+
     except Exception as e:
         logger.error(f"Error updating user role: {str(e)}")
         return jsonify({'error': 'Failed to update role'}), 500
 
 @app.route('/admin/users/<int:user_id>/password', methods=['PUT'])
+@app.auth_middleware.require_admin
 def change_user_password(user_id):
     """Change user password (admin only)"""
     try:
         data = request.get_json()
-        
+
         if not data or 'new_password' not in data:
             return jsonify({'error': 'New password is required'}), 400
-        
+
         new_password = data['new_password']
         success = app.db.change_password(user_id, new_password)
-        
+
         if success:
             return jsonify({'message': f'Password changed for user {user_id}'})
         else:
             return jsonify({'error': 'Failed to change password'}), 500
-        
+
     except Exception as e:
         logger.error(f"Error changing password: {str(e)}")
         return jsonify({'error': 'Failed to change password'}), 500
 
 @app.route('/admin/logs', methods=['GET'])
+@app.auth_middleware.require_admin
 def get_activity_logs():
     """Get activity logs (admin only)"""
     try:
         user_id = request.args.get('user_id', type=int)
         limit = request.args.get('limit', default=100, type=int)
-        
+
         logs = app.db.get_activity_logs(user_id=user_id, limit=limit)
         return jsonify({'logs': logs})
-        
+
     except Exception as e:
         logger.error(f"Error getting logs: {str(e)}")
         return jsonify({'error': 'Failed to get logs'}), 500
