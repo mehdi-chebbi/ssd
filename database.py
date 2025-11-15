@@ -109,7 +109,14 @@ class Database:
             else:
                 self._verify_api_keys_schema(cursor)
                 logger.info("Verified api_keys table schema")
-            
+
+            if 'jwt_tokens' not in existing_tables:
+                self._create_jwt_tokens_table(cursor)
+                logger.info("Created jwt_tokens table")
+            else:
+                self._verify_jwt_tokens_schema(cursor)
+                logger.info("Verified jwt_tokens table schema")
+
             # Create indexes for better performance
             self._create_indexes(cursor)
             
