@@ -30,6 +30,8 @@ def create_app():
     k8s_client = None
     hybrid_classifier = None
     db = None
+    jwt_utils = None
+    auth_middleware = None
     
     # Initialize K8s client
     try:
