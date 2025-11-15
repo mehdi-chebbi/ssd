@@ -664,22 +664,20 @@ def delete_chat_session(session_id):
 # ==================== CHAT ENDPOINT ====================
 
 @app.route('/chat', methods=['POST'])
+@app.auth_middleware.require_authentication
 def chat():
     """
     Enhanced intelligent chat endpoint with hybrid classification and database integration
     """
     try:
         data = request.get_json()
-        
+
         if not data or 'message' not in data:
             return jsonify({'error': 'Message is required'}), 400
-        
+
         user_message = data['message']
         session_id = data.get('session_id', 'default')
-        user_id = data.get('user_id')  # User ID from authentication
-        
-        if not user_id:
-            return jsonify({'error': 'User ID is required (please login)'}), 401
+        user_id = request.current_user['user_id']  # User ID from authentication
         
         logger.info(f"Received message from user {user_id}: {user_message}")
         
