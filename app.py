@@ -1019,36 +1019,36 @@ def create_kubeconfig():
         return jsonify({'error': 'Failed to create kubeconfig'}), 500
 
 @app.route('/admin/kubeconfigs/<int:kubeconfig_id>', methods=['GET'])
+@app.auth_middleware.require_admin
 def get_kubeconfig(kubeconfig_id):
     """Get a specific kubeconfig (admin only)"""
     try:
-        # TODO: Add authentication middleware to verify admin role
         kubeconfig = app.db.get_kubeconfig(kubeconfig_id)
-        
+
         if kubeconfig:
             return jsonify({'kubeconfig': kubeconfig})
         else:
             return jsonify({'error': 'Kubeconfig not found'}), 404
-        
+
     except Exception as e:
         logger.error(f"Error getting kubeconfig {kubeconfig_id}: {str(e)}")
         return jsonify({'error': 'Failed to get kubeconfig'}), 500
 
 @app.route('/admin/kubeconfigs/<int:kubeconfig_id>', methods=['PUT'])
+@app.auth_middleware.require_admin
 def update_kubeconfig(kubeconfig_id):
     """Update a kubeconfig (admin only)"""
     try:
-        # TODO: Add authentication middleware to verify admin role
         data = request.get_json()
-        
+
         if not data:
             return jsonify({'error': 'No data provided'}), 400
-        
+
         name = data.get('name')
         path = data.get('path')
         description = data.get('description')
         is_default = data.get('is_default')
-        
+
         success = app.db.update_kubeconfig(
             kubeconfig_id=kubeconfig_id,
             name=name,
@@ -1056,75 +1056,74 @@ def update_kubeconfig(kubeconfig_id):
             description=description,
             is_default=is_default
         )
-        
+
         if success:
             return jsonify({'message': f'Kubeconfig {kubeconfig_id} updated successfully'})
         else:
             return jsonify({'error': 'Failed to update kubeconfig or no changes made'}), 400
-        
+
     except Exception as e:
         logger.error(f"Error updating kubeconfig {kubeconfig_id}: {str(e)}")
         return jsonify({'error': 'Failed to update kubeconfig'}), 500
 
 @app.route('/admin/kubeconfigs/<int:kubeconfig_id>', methods=['DELETE'])
+@app.auth_middleware.require_admin
 def delete_kubeconfig(kubeconfig_id):
     """Delete a kubeconfig (admin only)"""
     try:
-        # TODO: Add authentication middleware to verify admin role
         success = app.db.delete_kubeconfig(kubeconfig_id)
-        
+
         if success:
             return jsonify({'message': f'Kubeconfig {kubeconfig_id} deleted successfully'})
         else:
             return jsonify({'error': 'Failed to delete kubeconfig'}), 500
-        
+
     except Exception as e:
         logger.error(f"Error deleting kubeconfig {kubeconfig_id}: {str(e)}")
         return jsonify({'error': 'Failed to delete kubeconfig'}), 500
 
 @app.route('/admin/kubeconfigs/<int:kubeconfig_id>/activate', methods=['POST'])
+@app.auth_middleware.require_admin
 def activate_kubeconfig(kubeconfig_id):
     """Set a kubeconfig as active (admin only)"""
     try:
-        # TODO: Add authentication middleware to verify admin role
         success = app.db.set_active_kubeconfig(kubeconfig_id)
-        
+
         if success:
             return jsonify({'message': f'Kubeconfig {kubeconfig_id} activated successfully'})
         else:
             return jsonify({'error': 'Failed to activate kubeconfig'}), 500
-        
+
     except Exception as e:
         logger.error(f"Error activating kubeconfig {kubeconfig_id}: {str(e)}")
         return jsonify({'error': 'Failed to activate kubeconfig'}), 500
 
 @app.route('/admin/kubeconfigs/<int:kubeconfig_id>/test', methods=['POST'])
+@app.auth_middleware.require_admin
 def test_kubeconfig(kubeconfig_id):
     """Test a kubeconfig connection (admin only)"""
     try:
-        # TODO: Add authentication middleware to verify admin role
-        
         # Get kubeconfig details
         kubeconfig = app.db.get_kubeconfig(kubeconfig_id)
         if not kubeconfig:
             return jsonify({'error': 'Kubeconfig not found'}), 404
-        
+
         # Test the kubeconfig using K8sClient
         try:
             from k8s_client import K8sClient
             k8s_client = K8sClient(kubeconfig_path=kubeconfig['path'])
-            
+
             # Try a simple kubectl command to test connectivity
             result = k8s_client._run_kubectl_command(['cluster-info'], timeout=10)
-            
+
             if result['success']:
                 # Update test result in database
                 app.db.update_kubeconfig_test_result(
-                    kubeconfig_id, 
-                    'success', 
+                    kubeconfig_id,
+                    'success',
                     'Connection successful - cluster info retrieved'
                 )
-                
+
                 return jsonify({
                     'success': True,
                     'message': 'Kubeconfig test successful',
@@ -1137,11 +1136,11 @@ def test_kubeconfig(kubeconfig_id):
             else:
                 # Update test result in database
                 app.db.update_kubeconfig_test_result(
-                    kubeconfig_id, 
-                    'failed', 
+                    kubeconfig_id,
+                    'failed',
                     result.get('error', 'Unknown error')
                 )
-                
+
                 return jsonify({
                     'success': False,
                     'message': 'Kubeconfig test failed',
@@ -1152,37 +1151,37 @@ def test_kubeconfig(kubeconfig_id):
                         'stderr': result.get('stderr', '')[:500] + '...' if len(result.get('stderr', '')) > 500 else result.get('stderr', '')
                     }
                 })
-                
+
         except Exception as test_error:
             # Update test result in database
             app.db.update_kubeconfig_test_result(
-                kubeconfig_id, 
-                'error', 
+                kubeconfig_id,
+                'error',
                 str(test_error)
             )
-            
+
             return jsonify({
                 'success': False,
                 'message': 'Kubeconfig test failed with exception',
                 'error': str(test_error)
             })
-        
+
     except Exception as e:
         logger.error(f"Error testing kubeconfig {kubeconfig_id}: {str(e)}")
         return jsonify({'error': 'Failed to test kubeconfig'}), 500
 
 @app.route('/admin/kubeconfigs/active', methods=['GET'])
+@app.auth_middleware.require_admin
 def get_active_kubeconfig():
     """Get currently active kubeconfig (admin only)"""
     try:
-        # TODO: Add authentication middleware to verify admin role
         kubeconfig = app.db.get_active_kubeconfig()
-        
+
         if kubeconfig:
             return jsonify({'kubeconfig': kubeconfig})
         else:
             return jsonify({'kubeconfig': None, 'message': 'No active kubeconfig found'})
-        
+
     except Exception as e:
         logger.error(f"Error getting active kubeconfig: {str(e)}")
         return jsonify({'error': 'Failed to get active kubeconfig'}), 500
@@ -1190,34 +1189,35 @@ def get_active_kubeconfig():
 # ==================== API KEYS ENDPOINTS ====================
 
 @app.route('/admin/api-keys', methods=['GET'])
+@app.auth_middleware.require_admin
 def get_api_keys():
     """Get all API keys (admin only)"""
     try:
-        # TODO: Add authentication middleware to verify admin role
         api_keys = app.db.get_all_api_keys()
         return jsonify({'api_keys': api_keys})
-        
+
     except Exception as e:
         logger.error(f"Error getting API keys: {str(e)}")
         return jsonify({'error': 'Failed to get API keys'}), 500
 
 @app.route('/admin/api-keys', methods=['POST'])
+@app.auth_middleware.require_admin
 def create_api_key():
     """Create new API key (admin only)"""
     try:
         data = request.get_json()
-        
+
         if not data or 'name' not in data or 'api_key' not in data:
             return jsonify({'error': 'Name and API key are required'}), 400
-        
+
         name = data['name']
         api_key = data['api_key']
         provider = data.get('provider', 'openrouter')
         description = data.get('description', '')
-        created_by = data.get('created_by')
-        
+        created_by = request.current_user['user_id']  # Use authenticated user ID
+
         api_key_id = app.db.create_api_key(name, api_key, provider, description, created_by)
-        
+
         if api_key_id:
             return jsonify({
                 'message': 'API key created successfully',
@@ -1225,93 +1225,94 @@ def create_api_key():
             }), 201
         else:
             return jsonify({'error': 'Failed to create API key - name may already exist'}), 400
-        
+
     except Exception as e:
         logger.error(f"Error creating API key: {str(e)}")
         return jsonify({'error': 'Failed to create API key'}), 500
 
 @app.route('/admin/api-keys/<int:api_key_id>', methods=['GET'])
+@app.auth_middleware.require_admin
 def get_api_key(api_key_id):
     """Get specific API key (admin only)"""
     try:
-        # TODO: Add authentication middleware to verify admin role
         api_key = app.db.get_api_key(api_key_id)
-        
+
         if api_key:
             return jsonify({'api_key': api_key})
         else:
             return jsonify({'error': 'API key not found'}), 404
-        
+
     except Exception as e:
         logger.error(f"Error getting API key {api_key_id}: {str(e)}")
         return jsonify({'error': 'Failed to get API key'}), 500
 
 @app.route('/admin/api-keys/<int:api_key_id>', methods=['PUT'])
+@app.auth_middleware.require_admin
 def update_api_key(api_key_id):
     """Update API key (admin only)"""
     try:
         data = request.get_json()
-        
+
         if not data:
             return jsonify({'error': 'No data provided'}), 400
-        
+
         name = data.get('name')
         api_key_value = data.get('api_key')
         provider = data.get('provider')
         description = data.get('description')
         is_active = data.get('is_active')
-        
+
         success = app.db.update_api_key(api_key_id, name, api_key_value, provider, description, is_active)
-        
+
         if success:
             return jsonify({'message': f'API key {api_key_id} updated successfully'})
         else:
             return jsonify({'error': 'Failed to update API key'}), 500
-        
+
     except Exception as e:
         logger.error(f"Error updating API key {api_key_id}: {str(e)}")
         return jsonify({'error': 'Failed to update API key'}), 500
 
 @app.route('/admin/api-keys/<int:api_key_id>', methods=['DELETE'])
+@app.auth_middleware.require_admin
 def delete_api_key(api_key_id):
     """Delete API key (admin only)"""
     try:
-        # TODO: Add authentication middleware to verify admin role
         success = app.db.delete_api_key(api_key_id)
-        
+
         if success:
             return jsonify({'message': f'API key {api_key_id} deleted successfully'})
         else:
             return jsonify({'error': 'Failed to delete API key'}), 500
-        
+
     except Exception as e:
         logger.error(f"Error deleting API key {api_key_id}: {str(e)}")
         return jsonify({'error': 'Failed to delete API key'}), 500
 
 @app.route('/admin/api-keys/<int:api_key_id>/activate', methods=['POST'])
+@app.auth_middleware.require_admin
 def activate_api_key(api_key_id):
     """Activate API key (admin only)"""
     try:
-        # TODO: Add authentication middleware to verify admin role
         success = app.db.set_active_api_key(api_key_id)
-        
+
         if success:
             return jsonify({'message': f'API key {api_key_id} activated successfully'})
         else:
             return jsonify({'error': 'Failed to activate API key'}), 500
-        
+
     except Exception as e:
         logger.error(f"Error activating API key {api_key_id}: {str(e)}")
         return jsonify({'error': 'Failed to activate API key'}), 500
 
 @app.route('/admin/api-keys/active', methods=['GET'])
+@app.auth_middleware.require_admin
 def get_active_api_key():
     """Get currently active API key (admin only)"""
     try:
-        # TODO: Add authentication middleware to verify admin role
         provider = request.args.get('provider', 'openrouter')
         api_key = app.db.get_active_api_key(provider)
-        
+
         if api_key:
             # Don't expose the actual API key in the response, just metadata
             safe_api_key = {
@@ -1329,7 +1330,7 @@ def get_active_api_key():
             return jsonify({'api_key': safe_api_key})
         else:
             return jsonify({'api_key': None, 'message': f'No active API key found for provider: {provider}'})
-        
+
     except Exception as e:
         logger.error(f"Error getting active API key: {str(e)}")
         return jsonify({'error': 'Failed to get active API key'}), 500
